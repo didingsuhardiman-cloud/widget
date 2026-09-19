@@ -1,0 +1,2371 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pemandangan & Dynamic Dashboard (MP3, MP4 & Radio Online)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Poppins -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Poppins', 'sans-serif'],
+                    },
+                    colors: {
+                        glass: 'rgba(255, 255, 255, 0.15)',
+                        'glass-dark': 'rgba(15, 23, 42, 0.55)',
+                        'glass-border': 'rgba(255, 255, 255, 0.25)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        /* Smooth Background Fade Transition */
+        .bg-layer {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            transition: opacity 1.5s cubic-bezier(0.4, 0, 0.2, 1), transform 12s ease-out;
+            will-change: opacity, transform;
+        }
+
+        .bg-layer.active {
+            opacity: 1;
+            transform: scale(1.04);
+        }
+
+        .bg-layer.inactive {
+            opacity: 0;
+            transform: scale(1.0);
+        }
+
+        /* Glassmorphism Styles */
+        .glass-card {
+            background: rgba(18, 24, 38, 0.55);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+        }
+
+        .glass-button {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            transition: all 0.3s ease;
+        }
+
+        .glass-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* Drag and Drop Card Styles */
+        .widget-card {
+            transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .widget-card.dragging {
+            opacity: 0.4;
+            transform: scale(0.98);
+            border: 2px dashed #3b82f6 !important;
+        }
+
+        .widget-card.drag-over {
+            border: 2px solid #60a5fa !important;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Range Slider Styling */
+        input[type="range"] {
+            accent-color: #3b82f6;
+        }
+
+        /* Centered Focus Widget Styling */
+        .widget-focused {
+            grid-column: 1 / -1 !important;
+            max-width: 34rem !important;
+            width: 100% !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5) !important;
+        }
+
+        /* Dynamic Visualizer Equalizer Bar Animations */
+        @keyframes pulseBar {
+            0%, 100% { height: 4px; }
+            50% { height: 20px; }
+        }
+        .eq-bar {
+            animation: pulseBar 0.8s ease-in-out infinite alternate;
+        }
+
+        /* UI Hide Transition */
+        .zen-hidden {
+            opacity: 0 !important;
+            pointer-events: none !important;
+            transform: translateY(-10px);
+            transition: all 0.4s ease;
+        }
+    </style>
+</head>
+<body class="relative min-h-screen text-white overflow-x-hidden bg-slate-950 flex flex-col justify-between p-4 md:p-8">
+
+    <!-- Background Container for Crossfade Images & Live Video Wallpaper -->
+    <div id="bg-container" class="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <!-- Live MP4 Video Background Layer -->
+        <video id="bg-video-layer" class="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 opacity-0 z-0" autoplay loop muted playsinline></video>
+        
+        <!-- Image Layers for Photo Slideshow -->
+        <div id="bg1" class="bg-layer active z-1"></div>
+        <div id="bg2" class="bg-layer inactive z-1"></div>
+        
+        <!-- Dark Overlay Gradient -->
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-900/40 to-slate-950/65 z-10"></div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- TOP NAVIGATION & HEADER -->
+    <header id="main-header" class="relative z-20 flex flex-wrap justify-between items-center gap-4 w-full max-w-7xl mx-auto transition-all duration-300">
+        <!-- Logo / Title -->
+        <div class="flex items-center gap-3 glass-card px-5 py-2.5 rounded-2xl">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 via-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-lg">
+                <i class="fa-solid fa-radio text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-base tracking-wide leading-tight">SereneSpace Pro</h1>
+                <p class="text-xs text-slate-300">Musik, MP4, Radio & Relaksasi</p>
+            </div>
+        </div>
+
+        <!-- Right Quick Controls -->
+        <div class="flex items-center gap-2 sm:gap-3">
+            <!-- Zen Mode / Hide UI Button -->
+            <button id="btn-zen-mode" title="Sembunyikan Semua Menu & Header" class="glass-button px-3 py-2 rounded-xl text-xs sm:text-sm font-medium flex items-center gap-2 text-indigo-300 hover:bg-indigo-500/20">
+                <i id="zen-icon" class="fa-solid fa-eye-slash"></i>
+                <span class="hidden sm:inline">Sembunyikan Menu</span>
+            </button>
+
+            <!-- Widget Manager Button -->
+            <button id="btn-widget-manager" title="Kelola & Pulihkan Widget" class="glass-button px-3 py-2 rounded-xl text-xs sm:text-sm font-medium flex items-center gap-2 text-amber-300 hover:bg-amber-500/20">
+                <i class="fa-solid fa-sliders"></i>
+                <span class="hidden sm:inline">Kelola Widget</span>
+            </button>
+
+            <!-- Background Mode Toggle -->
+            <button id="btn-bg-mode" title="Beralih Wallpaper Foto / Live Video" class="glass-button px-3 py-2 rounded-xl text-xs sm:text-sm font-medium flex items-center gap-2">
+                <i id="bg-mode-icon" class="fa-solid fa-image text-blue-400"></i>
+                <span id="bg-mode-text" class="hidden sm:inline">Mode Foto</span>
+            </button>
+
+            <!-- Background Timer / Pause Switch -->
+            <button id="btn-toggle-slideshow" title="Jeda / Putar Slideshow Background" class="glass-button px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium flex items-center gap-2">
+                <i id="slideshow-icon" class="fa-solid fa-pause text-blue-400"></i>
+                <span id="slideshow-text" class="hidden sm:inline">Ganti Otomatis</span>
+            </button>
+
+            <!-- Change Background Manual Button -->
+            <button id="btn-next-bg" title="Ganti Pemandangan Sekarang" class="glass-button p-2.5 px-3.5 rounded-xl text-sm flex items-center gap-2">
+                <i class="fa-solid fa-forward"></i>
+                <span class="hidden sm:inline text-xs">Pemandangan Berikutnya</span>
+            </button>
+
+            <!-- Fullscreen Button -->
+            <button id="btn-fullscreen" title="Layar Penuh" class="glass-button w-10 h-10 rounded-xl flex items-center justify-center">
+                <i class="fa-solid fa-expand"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- WIDGET MANAGER MODAL -->
+    <div id="widget-manager-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="glass-card max-w-md w-full p-6 rounded-3xl border border-white/20 shadow-2xl space-y-5">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                <h3 class="font-bold text-base flex items-center gap-2 text-white">
+                    <i class="fa-solid fa-sliders text-amber-400"></i> Kelola & Pulihkan Widget
+                </h3>
+                <button id="btn-close-widget-manager" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <p class="text-xs text-slate-300">Centang widget yang ingin ditampilkan di dashboard atau atur ulang urutan standar:</p>
+
+            <div id="widget-toggle-list" class="space-y-2.5 text-xs max-h-60 overflow-y-auto pr-1">
+                <!-- Checkboxes populated by JS -->
+            </div>
+
+            <div class="pt-3 border-t border-white/10 flex items-center justify-between gap-3">
+                <button id="btn-reset-layout" class="glass-button px-3 py-2 rounded-xl text-xs font-medium text-rose-300 hover:bg-rose-500/20">
+                    <i class="fa-solid fa-rotate-left me-1"></i> Reset Tata Letak
+                </button>
+                <button id="btn-save-widget-manager" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-lg">
+                    Selesai
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN CONTENT DASHBOARD WITH REORDERABLE WIDGETS -->
+    <main id="widgets-container" class="relative z-20 w-full max-w-7xl mx-auto my-auto py-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-start">
+
+        <!-- WIDGET 1: Hero Clock & Greetings -->
+        <div id="widget-clock" draggable="true" data-widget-id="clock" class="widget-card col-span-1 glass-card p-5 sm:p-6 rounded-3xl relative overflow-hidden group border border-white/10">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-3 pb-2 border-b border-white/10 select-none">
+                <div class="flex items-center gap-2 cursor-grab active:cursor-grabbing widget-handle" title="Tarik untuk memindahkan urutan">
+                    <i class="fa-solid fa-grip-vertical text-slate-400"></i>
+                    <span class="font-semibold text-slate-200 text-xs flex items-center gap-1.5">
+                        <i class="fa-solid fa-clock text-blue-400"></i> Jam & Suasana
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button class="btn-focus-widget text-slate-400 hover:text-amber-300 p-1" title="Fokus / Posisikan di Tengah"><i class="fa-solid fa-arrows-to-eye"></i></button>
+                    <button class="btn-toggle-collapse text-slate-400 hover:text-white p-1" title="Ciutkan Widget"><i class="fa-solid fa-chevron-up"></i></button>
+                    <button class="btn-hide-widget text-slate-400 hover:text-rose-400 p-1" title="Sembunyikan Widget"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+
+            <div class="widget-content">
+                <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                
+                <span id="greeting-badge" class="inline-block px-3 py-1 bg-blue-500/20 text-blue-300 text-xs font-semibold rounded-full mb-3 border border-blue-500/30">
+                    Selamat Hari ini
+                </span>
+                
+                <h2 id="digital-clock" class="text-4xl sm:text-5xl font-extrabold tracking-tight drop-shadow-md text-white font-mono">
+                    00:00:00
+                </h2>
+                
+                <p id="date-display" class="text-slate-300 text-xs sm:text-sm mt-2 font-medium flex items-center gap-2">
+                    <i class="fa-regular fa-calendar text-blue-400"></i> Loading tanggal...
+                </p>
+
+                <div class="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-xs text-slate-300">
+                    <span class="flex items-center gap-2 truncate">
+                        <i class="fa-solid fa-location-dot text-rose-400 shrink-0"></i>
+                        <span id="bg-title" class="truncate">Lokasi: Pegunungan Swiss Alps</span>
+                    </span>
+                    <span id="bg-counter" class="text-slate-400 font-mono shrink-0">1 / 6</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- WIDGET 2: Radio Online Indonesia (Baru Ditingkatkan) -->
+        <div id="widget-radio" draggable="true" data-widget-id="radio" class="widget-card col-span-1 glass-card p-5 rounded-3xl flex flex-col justify-between border border-white/10 relative overflow-hidden">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-3 pb-2 border-b border-white/10 select-none">
+                <div class="flex items-center gap-2 cursor-grab active:cursor-grabbing widget-handle" title="Tarik untuk memindahkan urutan">
+                    <i class="fa-solid fa-grip-vertical text-slate-400"></i>
+                    <span class="font-semibold text-slate-200 text-xs flex items-center gap-1.5">
+                        <i class="fa-solid fa-radio text-rose-400"></i> Radio Online Indonesia
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button class="btn-focus-widget text-slate-400 hover:text-amber-300 p-1" title="Fokus / Posisikan di Tengah"><i class="fa-solid fa-arrows-to-eye"></i></button>
+                    <button class="btn-toggle-collapse text-slate-400 hover:text-white p-1" title="Ciutkan Widget"><i class="fa-solid fa-chevron-up"></i></button>
+                    <button class="btn-hide-widget text-slate-400 hover:text-rose-400 p-1" title="Sembunyikan Widget"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+
+            <div class="widget-content space-y-3">
+                <!-- Radio Category Pill Filters -->
+                <div id="radio-category-pills" class="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] no-scrollbar">
+                    <button data-cat="all" class="btn-radio-cat px-2.5 py-1 rounded-xl bg-blue-600 text-white font-medium shrink-0">Semua</button>
+                    <button data-cat="pop" class="btn-radio-cat px-2.5 py-1 rounded-xl glass-button text-slate-300 shrink-0">Pop / Hits</button>
+                    <button data-cat="berita" class="btn-radio-cat px-2.5 py-1 rounded-xl glass-button text-slate-300 shrink-0">Berita</button>
+                    <button data-cat="religi" class="btn-radio-cat px-2.5 py-1 rounded-xl glass-button text-slate-300 shrink-0">Religi</button>
+                    <button data-cat="dangdut" class="btn-radio-cat px-2.5 py-1 rounded-xl glass-button text-slate-300 shrink-0">Dangdut</button>
+                </div>
+
+                <!-- Active Station Card Display Banner -->
+                <div class="bg-gradient-to-r from-slate-900/90 to-slate-900/50 p-3.5 rounded-2xl border border-white/10 relative overflow-hidden">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div id="radio-station-logo" class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center text-white text-lg font-bold shadow-md shrink-0">
+                                <i class="fa-solid fa-radio"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <h4 id="radio-station-title" class="font-bold text-xs sm:text-sm text-white truncate">Prambors FM 102.2</h4>
+                                <p id="radio-station-subtitle" class="text-[10px] text-slate-300 truncate flex items-center gap-1.5 mt-0.5">
+                                    <span id="radio-station-city" class="bg-rose-500/30 text-rose-300 px-1.5 py-0.5 rounded text-[9px]">Jakarta</span>
+                                    <span id="radio-station-genre" class="text-slate-400">Hits / Pop</span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- LIVE Badge & Equalizer -->
+                        <div class="flex flex-col items-end gap-1.5 shrink-0">
+                            <span id="radio-live-badge" class="inline-flex items-center gap-1 bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                                <span class="w-1.5 h-1.5 bg-rose-400 rounded-full animate-ping"></span> LIVE
+                            </span>
+                            
+                            <!-- Animated Equalizer Bars -->
+                            <div id="radio-bars-container" class="flex items-end gap-0.5 h-4 opacity-40">
+                                <div class="w-1 bg-rose-400 rounded-sm eq-bar" style="animation-delay: 0.1s"></div>
+                                <div class="w-1 bg-rose-400 rounded-sm eq-bar" style="animation-delay: 0.3s"></div>
+                                <div class="w-1 bg-rose-400 rounded-sm eq-bar" style="animation-delay: 0.2s"></div>
+                                <div class="w-1 bg-rose-400 rounded-sm eq-bar" style="animation-delay: 0.4s"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Radio Streaming Audio Player Element -->
+                    <audio id="radio-audio-player" class="hidden" crossorigin="anonymous"></audio>
+                </div>
+
+                <!-- Radio Controls & Select Station -->
+                <div class="space-y-2.5">
+                    <!-- Station Selection Dropdown -->
+                    <div class="flex items-center gap-2">
+                        <select id="select-radio-station" class="flex-1 bg-slate-900/80 border border-white/10 text-xs text-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-rose-400 cursor-pointer">
+                            <!-- Populated by JS -->
+                        </select>
+                        
+                        <!-- Toggle Add Custom Stream Form -->
+                        <button id="btn-toggle-custom-radio" title="Tambah URL Radio Custom" class="glass-button p-2 rounded-xl text-xs text-rose-300 hover:bg-rose-500/20">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                    </div>
+
+                    <!-- Custom Radio Stream Input Form Drawer (Hidden by Default) -->
+                    <div id="custom-radio-form" class="hidden bg-slate-900/60 p-2.5 rounded-2xl border border-white/10 space-y-2 text-xs">
+                        <p class="text-[10px] text-slate-300 font-semibold flex items-center gap-1">
+                            <i class="fa-solid fa-link text-rose-400"></i> Tambah Stream Radio Custom (Icecast / MP3):
+                        </p>
+                        <input type="text" id="custom-radio-name" placeholder="Nama Stasiun (misal: Radio Komunitas)" class="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none">
+                        <input type="url" id="custom-radio-url" placeholder="https://stream.radio.com/live" class="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none">
+                        <div class="flex justify-end gap-2">
+                            <button id="btn-cancel-custom-radio" class="px-2.5 py-1 text-[11px] text-slate-400 hover:text-white">Batal</button>
+                            <button id="btn-add-custom-radio" class="bg-rose-600 hover:bg-rose-500 text-white px-3 py-1 rounded-xl text-[11px] font-semibold">Simpan</button>
+                        </div>
+                    </div>
+
+                    <!-- Main Radio Play / Stop & Volume -->
+                    <div class="flex items-center justify-between bg-slate-900/40 p-2 rounded-2xl border border-white/5">
+                        <div class="flex items-center gap-3">
+                            <button id="btn-play-radio" class="w-10 h-10 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center shadow-lg transition transform hover:scale-105 shrink-0">
+                                <i id="radio-play-icon" class="fa-solid fa-play ms-0.5"></i>
+                            </button>
+                            <div>
+                                <p id="radio-status-text" class="text-xs font-semibold text-slate-200">Siap Memutar</p>
+                                <p id="radio-buffer-info" class="text-[10px] text-slate-400 font-mono">Klik Putar untuk Live Stream</p>
+                            </div>
+                        </div>
+
+                        <!-- Radio Volume -->
+                        <div class="flex items-center gap-2 pr-2">
+                            <i id="radio-volume-icon" class="fa-solid fa-volume-high text-slate-400 text-xs cursor-pointer"></i>
+                            <input type="range" id="radio-volume-slider" min="0" max="1" step="0.05" value="0.8" class="w-16 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- WIDGET 3: Ambient Sound Generator Panel -->
+        <div id="widget-rain" draggable="true" data-widget-id="rain" class="widget-card col-span-1 glass-card p-5 rounded-3xl flex flex-col justify-between border border-white/10">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-3 pb-2 border-b border-white/10 select-none">
+                <div class="flex items-center gap-2 cursor-grab active:cursor-grabbing widget-handle" title="Tarik untuk memindahkan urutan">
+                    <i class="fa-solid fa-grip-vertical text-slate-400"></i>
+                    <span class="font-semibold text-slate-200 text-xs flex items-center gap-1.5">
+                        <i class="fa-solid fa-spa text-emerald-400"></i> Suara Relaksasi & Ambient
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button class="btn-focus-widget text-slate-400 hover:text-amber-300 p-1" title="Fokus / Posisikan di Tengah"><i class="fa-solid fa-arrows-to-eye"></i></button>
+                    <button class="btn-toggle-collapse text-slate-400 hover:text-white p-1" title="Ciutkan Widget"><i class="fa-solid fa-chevron-up"></i></button>
+                    <button class="btn-hide-widget text-slate-400 hover:text-rose-400 p-1" title="Sembunyikan Widget"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+
+            <div class="widget-content space-y-2.5">
+                <div class="flex items-center justify-between">
+                    <p class="text-xs font-semibold text-slate-300">Pilih Suara Relaksasi (Synth):</p>
+                    <button id="btn-stop-all-sounds" class="text-[10px] text-rose-400 hover:text-rose-300 underline font-medium hidden">
+                        <i class="fa-solid fa-stop me-1"></i>Matikan Semua
+                    </button>
+                </div>
+
+                <div class="space-y-2 text-xs">
+                    <!-- Hujan -->
+                    <div class="bg-slate-900/50 p-2 rounded-2xl border border-white/5 flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <i class="fa-solid fa-cloud-showers-heavy text-emerald-400 text-sm w-4 text-center"></i>
+                            <div>
+                                <p class="font-semibold text-xs">Suara Hujan</p>
+                                <p class="text-[10px] text-slate-400">Hujan lebat alami</p>
+                            </div>
+                        </div>
+                        <button data-sound="rain" class="btn-ambient-toggle glass-button px-3 py-1.5 rounded-xl text-[11px] font-medium text-emerald-300">
+                            <i class="fa-solid fa-play me-1"></i>Putar
+                        </button>
+                    </div>
+
+                    <!-- Ombak -->
+                    <div class="bg-slate-900/50 p-2 rounded-2xl border border-white/5 flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <i class="fa-solid fa-water text-cyan-400 text-sm w-4 text-center"></i>
+                            <div>
+                                <p class="font-semibold text-xs">Ombak Laut</p>
+                                <p class="text-[10px] text-slate-400">Desir ombak pantai</p>
+                            </div>
+                        </div>
+                        <button data-sound="ocean" class="btn-ambient-toggle glass-button px-3 py-1.5 rounded-xl text-[11px] font-medium text-cyan-300">
+                            <i class="fa-solid fa-play me-1"></i>Putar
+                        </button>
+                    </div>
+
+                    <!-- Angin -->
+                    <div class="bg-slate-900/50 p-2 rounded-2xl border border-white/5 flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <i class="fa-solid fa-wind text-teal-300 text-sm w-4 text-center"></i>
+                            <div>
+                                <p class="font-semibold text-xs">Deru Angin</p>
+                                <p class="text-[10px] text-slate-400">Angin sepoi hutan</p>
+                            </div>
+                        </div>
+                        <button data-sound="wind" class="btn-ambient-toggle glass-button px-3 py-1.5 rounded-xl text-[11px] font-medium text-teal-200">
+                            <i class="fa-solid fa-play me-1"></i>Putar
+                        </button>
+                    </div>
+
+                    <!-- Binaural -->
+                    <div class="bg-slate-900/50 p-2 rounded-2xl border border-white/5 flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <i class="fa-solid fa-brain text-purple-400 text-sm w-4 text-center"></i>
+                            <div>
+                                <p class="font-semibold text-xs">Alpha Binaural</p>
+                                <p class="text-[10px] text-slate-400">Gelombang fokus 10Hz</p>
+                            </div>
+                        </div>
+                        <button data-sound="binaural" class="btn-ambient-toggle glass-button px-3 py-1.5 rounded-xl text-[11px] font-medium text-purple-300">
+                            <i class="fa-solid fa-play me-1"></i>Putar
+                        </button>
+                    </div>
+
+                    <!-- Api Unggun -->
+                    <div class="bg-slate-900/50 p-2 rounded-2xl border border-white/5 flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <i class="fa-solid fa-fire text-amber-400 text-sm w-4 text-center"></i>
+                            <div>
+                                <p class="font-semibold text-xs">Api Unggun</p>
+                                <p class="text-[10px] text-slate-400">Derik kayu hangat</p>
+                            </div>
+                        </div>
+                        <button data-sound="fire" class="btn-ambient-toggle glass-button px-3 py-1.5 rounded-xl text-[11px] font-medium text-amber-300">
+                            <i class="fa-solid fa-play me-1"></i>Putar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- WIDGET 4: Mini Calendar Widget -->
+        <div id="widget-calendar" draggable="true" data-widget-id="calendar" class="widget-card col-span-1 glass-card p-5 rounded-3xl flex flex-col justify-between border border-white/10">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-3 pb-2 border-b border-white/10 select-none">
+                <div class="flex items-center gap-2 cursor-grab active:cursor-grabbing widget-handle" title="Tarik untuk memindahkan urutan">
+                    <i class="fa-solid fa-grip-vertical text-slate-400"></i>
+                    <span class="font-semibold text-slate-200 text-xs flex items-center gap-1.5">
+                        <i class="fa-solid fa-calendar-days text-blue-400"></i> Kalender & Catatan
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button class="btn-focus-widget text-slate-400 hover:text-amber-300 p-1" title="Fokus / Posisikan di Tengah"><i class="fa-solid fa-arrows-to-eye"></i></button>
+                    <button class="btn-toggle-collapse text-slate-400 hover:text-white p-1" title="Ciutkan Widget"><i class="fa-solid fa-chevron-up"></i></button>
+                    <button class="btn-hide-widget text-slate-400 hover:text-rose-400 p-1" title="Sembunyikan Widget"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+
+            <div class="widget-content">
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 id="cal-month-year" class="font-semibold text-sm sm:text-base">Januari 2026</h3>
+                        <div class="flex items-center gap-1">
+                            <button id="cal-prev" class="w-7 h-7 rounded-lg glass-button flex items-center justify-center text-xs hover:text-blue-400">
+                                <i class="fa-solid fa-chevron-left"></i>
+                            </button>
+                            <button id="cal-today" class="px-2 py-1 rounded-lg glass-button text-[10px] font-semibold text-blue-300">
+                                Hari Ini
+                            </button>
+                            <button id="cal-next" class="w-7 h-7 rounded-lg glass-button flex items-center justify-center text-xs hover:text-blue-400">
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-slate-400 mb-2">
+                        <span class="text-rose-400">Min</span>
+                        <span>Sen</span>
+                        <span>Sel</span>
+                        <span>Rab</span>
+                        <span>Kam</span>
+                        <span>Jum</span>
+                        <span>Sab</span>
+                    </div>
+
+                    <div id="cal-days" class="grid grid-cols-7 gap-1 text-center text-xs font-medium">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-white/10">
+                    <div class="flex items-center justify-between text-xs mb-1">
+                        <span id="selected-date-label" class="text-slate-300 font-medium">Catatan Tanggal Ini:</span>
+                        <button id="btn-save-note" class="text-blue-400 hover:underline font-semibold text-[11px]">
+                            <i class="fa-solid fa-floppy-disk me-1"></i>Simpan
+                        </button>
+                    </div>
+                    <input type="text" id="date-note-input" placeholder="Tambah pengingat..." 
+                        class="w-full bg-slate-900/60 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-400">
+                </div>
+            </div>
+        </div>
+
+        <!-- WIDGET 5: Universal Media Player (MP3 & MP4) -->
+        <div id="widget-player" draggable="true" data-widget-id="player" class="widget-card col-span-1 glass-card p-5 rounded-3xl flex flex-col justify-between border border-white/10 relative overflow-hidden">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-3 pb-2 border-b border-white/10 select-none">
+                <div class="flex items-center gap-2 cursor-grab active:cursor-grabbing widget-handle" title="Tarik untuk memindahkan urutan">
+                    <i class="fa-solid fa-grip-vertical text-slate-400"></i>
+                    <span class="font-semibold text-slate-200 text-xs flex items-center gap-1.5">
+                        <i class="fa-solid fa-photo-film text-purple-400"></i> Pemutar Media (MP3 & MP4)
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button class="btn-focus-widget text-slate-400 hover:text-amber-300 p-1" title="Fokus / Posisikan di Tengah"><i class="fa-solid fa-arrows-to-eye"></i></button>
+                    <button class="btn-toggle-collapse text-slate-400 hover:text-white p-1" title="Ciutkan Widget"><i class="fa-solid fa-chevron-up"></i></button>
+                    <button class="btn-hide-widget text-slate-400 hover:text-rose-400 p-1" title="Sembunyikan Widget"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+
+            <div class="widget-content">
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                            <span class="text-xs font-medium text-slate-300">Status Pemutar</span>
+                        </div>
+                        
+                        <label title="Upload File MP3 / MP4 Video" class="cursor-pointer glass-button px-2.5 py-1 rounded-lg text-xs text-blue-300 flex items-center gap-1.5 hover:bg-blue-500/20">
+                            <i class="fa-solid fa-file-video text-rose-400"></i>
+                            <span class="text-[11px] font-medium">Upload Media</span>
+                            <input type="file" id="media-file-input" accept="audio/*,video/mp4,video/webm,video/ogg,video/quicktime" multiple class="hidden">
+                        </label>
+                    </div>
+
+                    <div class="flex items-center gap-3 bg-slate-900/50 p-2.5 rounded-2xl border border-white/10 mb-3">
+                        <div id="media-badge" class="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-blue-500 flex items-center justify-center text-white font-bold text-base shadow-lg shrink-0">
+                            <i id="media-type-icon" class="fa-solid fa-music"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p id="media-title" class="font-semibold text-xs sm:text-sm truncate">Lofi Ambient Landscape</p>
+                            <p id="media-subtitle" class="text-[10px] text-slate-400 truncate flex items-center gap-1.5">
+                                <span id="media-format-badge" class="bg-blue-500/30 text-blue-300 px-1.5 py-0.5 rounded text-[9px] uppercase font-mono">MP3</span>
+                                <span id="media-artist">Serene Soundscape</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Screen Area (Canvas / Video) -->
+                    <div id="media-screen-container" class="w-full h-32 bg-slate-950/80 rounded-2xl p-1 mb-3 flex items-center justify-center overflow-hidden border border-white/10 relative group">
+                        <video id="player-video" class="w-full h-full object-contain rounded-xl hidden" crossorigin="anonymous" playsinline></video>
+                        <canvas id="visualizer-canvas" class="w-full h-full block"></canvas>
+
+                        <div id="video-overlay-bar" class="absolute bottom-2 left-2 right-2 bg-slate-950/80 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-white/10 flex items-center justify-between text-xs text-slate-300 opacity-0 group-hover:opacity-100 transition duration-300">
+                            <button id="btn-set-bg-video" title="Jadikan Live Wallpaper Background" class="hover:text-blue-400 flex items-center gap-1 text-[11px]">
+                                <i class="fa-solid fa-desktop text-blue-400"></i> Set Live BG
+                            </button>
+                            <div class="flex items-center gap-1">
+                                <span class="text-[10px] text-slate-400">Speed:</span>
+                                <select id="select-speed" class="bg-slate-800 text-white text-[10px] rounded px-1 py-0.5 border border-white/10 focus:outline-none">
+                                    <option value="0.5">0.5x</option>
+                                    <option value="1" selected>1.0x</option>
+                                    <option value="1.25">1.25x</option>
+                                    <option value="1.5">1.5x</option>
+                                    <option value="2">2.0x</option>
+                                </select>
+                            </div>
+                            <button id="btn-pip-video" title="Picture in Picture Mode" class="hover:text-blue-400 text-xs">
+                                <i class="fa-solid fa-clone"></i>
+                            </button>
+                            <button id="btn-video-fullscreen" title="Layar Penuh Video" class="hover:text-blue-400 text-xs">
+                                <i class="fa-solid fa-expand"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-1">
+                        <input type="range" id="seek-slider" min="0" max="100" value="0" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                        <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+                            <span id="current-time">0:00</span>
+                            <span id="duration-time">0:00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-2">
+                    <div class="flex items-center justify-center gap-4 mb-2">
+                        <button id="btn-prev-track" class="text-slate-300 hover:text-white transition text-sm">
+                            <i class="fa-solid fa-backward-step"></i>
+                        </button>
+                        <button id="btn-play-pause" class="w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center shadow-lg transition transform hover:scale-105">
+                            <i id="play-icon" class="fa-solid fa-play ms-0.5"></i>
+                        </button>
+                        <button id="btn-next-track" class="text-slate-300 hover:text-white transition text-sm">
+                            <i class="fa-solid fa-forward-step"></i>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-white/10">
+                        <div class="flex items-center gap-2">
+                            <i id="volume-icon" class="fa-solid fa-volume-high text-slate-300 cursor-pointer"></i>
+                            <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="0.8" class="w-16 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                        </div>
+
+                        <button id="btn-toggle-playlist" class="text-blue-300 hover:underline flex items-center gap-1 text-[11px]">
+                            <i class="fa-solid fa-list-ul"></i> Playlist (<span id="playlist-count">3</span>)
+                        </button>
+                    </div>
+                </div>
+
+                <audio id="player-audio" crossorigin="anonymous"></audio>
+
+                <div id="playlist-drawer" class="absolute inset-0 bg-slate-950/95 backdrop-blur-xl p-4 transition-all duration-300 transform translate-y-full flex flex-col justify-between z-30">
+                    <div>
+                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-white/10">
+                            <h4 class="font-semibold text-xs flex items-center gap-2">
+                                <i class="fa-solid fa-list text-blue-400"></i> Playlist Media
+                            </h4>
+                            <button id="btn-close-playlist" class="text-slate-400 hover:text-white text-sm">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                        <ul id="playlist-items" class="space-y-1.5 max-h-48 overflow-y-auto text-xs pr-1">
+                            <!-- Populated by JS -->
+                        </ul>
+                    </div>
+                    <div class="pt-2 border-t border-white/10 flex items-center justify-between text-[10px] text-slate-400">
+                        <span>Dukungan: MP4, MP3, WAV, WebM</span>
+                        <label for="media-file-input" class="text-blue-400 hover:underline cursor-pointer font-semibold">+ Tambah File</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- WIDGET 6: Jadwal Sholat & Tanggal Hijriah -->
+        <div id="widget-sholat" draggable="true" data-widget-id="sholat" class="widget-card col-span-1 glass-card p-5 rounded-3xl flex flex-col justify-between border border-white/10">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-3 pb-2 border-b border-white/10 select-none">
+                <div class="flex items-center gap-2 cursor-grab active:cursor-grabbing widget-handle" title="Tarik untuk memindahkan urutan">
+                    <i class="fa-solid fa-grip-vertical text-slate-400"></i>
+                    <span class="font-semibold text-slate-200 text-xs flex items-center gap-1.5">
+                        <i class="fa-solid fa-mosque text-emerald-400"></i> Jadwal Sholat
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button class="btn-focus-widget text-slate-400 hover:text-amber-300 p-1" title="Fokus / Posisikan di Tengah"><i class="fa-solid fa-arrows-to-eye"></i></button>
+                    <button class="btn-toggle-collapse text-slate-400 hover:text-white p-1" title="Ciutkan Widget"><i class="fa-solid fa-chevron-up"></i></button>
+                    <button class="btn-hide-widget text-slate-400 hover:text-rose-400 p-1" title="Sembunyikan Widget"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+
+            <div class="widget-content space-y-3">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-1.5 bg-slate-900/60 border border-white/10 px-2.5 py-1 rounded-xl text-xs">
+                        <i class="fa-solid fa-location-dot text-emerald-400 text-xs"></i>
+                        <select id="select-sholat-city" class="bg-transparent text-slate-200 font-medium focus:outline-none cursor-pointer text-xs">
+                            <option value="Jakarta" class="bg-slate-900">Jakarta</option>
+                            <option value="Bandung" class="bg-slate-900">Bandung</option>
+                            <option value="Surabaya" class="bg-slate-900">Surabaya</option>
+                            <option value="Medan" class="bg-slate-900">Medan</option>
+                            <option value="Semarang" class="bg-slate-900">Semarang</option>
+                            <option value="Yogyakarta" class="bg-slate-900">Yogyakarta</option>
+                            <option value="Makassar" class="bg-slate-900">Makassar</option>
+                            <option value="Denpasar" class="bg-slate-900">Denpasar</option>
+                            <option value="Palembang" class="bg-slate-900">Palembang</option>
+                            <option value="Banten" class="bg-slate-900">Cilegon / Banten</option>
+                        </select>
+                    </div>
+
+                    <span id="hijri-date-badge" class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-xl border border-emerald-500/30 font-semibold truncate">
+                        1447 Hijriah
+                    </span>
+                </div>
+
+                <div class="bg-gradient-to-r from-emerald-950/60 to-slate-900/60 p-3 rounded-2xl border border-emerald-500/20 flex items-center justify-between">
+                    <div>
+                        <p class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Sholat Berikutnya</p>
+                        <h4 id="next-prayer-name" class="font-bold text-sm text-emerald-300">Dzuhur</h4>
+                    </div>
+                    <div class="text-right">
+                        <p id="next-prayer-countdown" class="font-mono text-xs font-bold text-amber-300">00:00:00</p>
+                        <p id="next-prayer-time" class="text-[10px] text-slate-400 font-mono">12:05 WIB</p>
+                    </div>
+                </div>
+
+                <div id="sholat-grid" class="grid grid-cols-3 gap-1.5 text-center text-xs">
+                    <div data-prayer="Fajr" class="prayer-card bg-slate-900/50 p-2 rounded-xl border border-white/5">
+                        <p class="text-[10px] text-slate-400">Subuh</p>
+                        <p class="time-val font-semibold font-mono text-emerald-300 mt-0.5">04:30</p>
+                    </div>
+                    <div data-prayer="Dhuhr" class="prayer-card bg-slate-900/50 p-2 rounded-xl border border-white/5">
+                        <p class="text-[10px] text-slate-400">Dzuhur</p>
+                        <p class="time-val font-semibold font-mono text-emerald-300 mt-0.5">12:05</p>
+                    </div>
+                    <div data-prayer="Asr" class="prayer-card bg-slate-900/50 p-2 rounded-xl border border-white/5">
+                        <p class="text-[10px] text-slate-400">Ashar</p>
+                        <p class="time-val font-semibold font-mono text-emerald-300 mt-0.5">15:18</p>
+                    </div>
+                    <div data-prayer="Maghrib" class="prayer-card bg-slate-900/50 p-2 rounded-xl border border-white/5">
+                        <p class="text-[10px] text-slate-400">Maghrib</p>
+                        <p class="time-val font-semibold font-mono text-emerald-300 mt-0.5">18:10</p>
+                    </div>
+                    <div data-prayer="Isha" class="prayer-card bg-slate-900/50 p-2 rounded-xl border border-white/5">
+                        <p class="text-[10px] text-slate-400">Isya</p>
+                        <p class="time-val font-semibold font-mono text-emerald-300 mt-0.5">19:22</p>
+                    </div>
+                    <div data-prayer="Sunrise" class="prayer-card bg-slate-900/50 p-2 rounded-xl border border-white/5">
+                        <p class="text-[10px] text-slate-400">Syuruq</p>
+                        <p class="time-val font-semibold font-mono text-slate-300 mt-0.5">05:48</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- WIDGET 7: Memo Khusus & Sticky Notes -->
+        <div id="widget-memo" draggable="true" data-widget-id="memo" class="widget-card col-span-1 glass-card p-5 rounded-3xl flex flex-col justify-between border border-white/10">
+            <div class="flex items-center justify-between text-xs text-slate-400 mb-3 pb-2 border-b border-white/10 select-none">
+                <div class="flex items-center gap-2 cursor-grab active:cursor-grabbing widget-handle" title="Tarik untuk memindahkan urutan">
+                    <i class="fa-solid fa-grip-vertical text-slate-400"></i>
+                    <span class="font-semibold text-slate-200 text-xs flex items-center gap-1.5">
+                        <i class="fa-solid fa-note-sticky text-amber-400"></i> Memo Khusus
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button class="btn-focus-widget text-slate-400 hover:text-amber-300 p-1" title="Fokus / Posisikan di Tengah"><i class="fa-solid fa-arrows-to-eye"></i></button>
+                    <button class="btn-toggle-collapse text-slate-400 hover:text-white p-1" title="Ciutkan Widget"><i class="fa-solid fa-chevron-up"></i></button>
+                    <button class="btn-hide-widget text-slate-400 hover:text-rose-400 p-1" title="Sembunyikan Widget"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+
+            <div class="widget-content space-y-3">
+                <form id="memo-form" class="flex flex-col gap-2">
+                    <div class="flex items-center gap-2">
+                        <input type="text" id="memo-input" placeholder="Tulis memo atau tugas cepat..." required
+                            class="flex-1 bg-slate-900/60 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400">
+                        <select id="memo-color-select" class="bg-slate-900/80 border border-white/10 text-xs text-slate-200 rounded-xl px-2 py-1.5 focus:outline-none">
+                            <option value="amber">🟡 Penting</option>
+                            <option value="emerald">🟢 Kerja</option>
+                            <option value="blue">🔵 Pribadi</option>
+                            <option value="rose">🔴 Mendesak</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="bg-amber-500/80 hover:bg-amber-500 text-slate-950 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition shadow-md">
+                        <i class="fa-solid fa-plus text-xs"></i> Tambah Memo
+                    </button>
+                </form>
+
+                <div id="memo-list" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    <!-- Dynamic Memo Items populated by JS -->
+                </div>
+
+                <div class="pt-2 border-t border-white/10 flex items-center justify-between text-[10px] text-slate-400">
+                    <span id="memo-count-label">0 Memo Tersimpan</span>
+                    <button id="btn-clear-done-memos" class="text-rose-400 hover:underline">Hapus Selesai</button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FOOTER INFO -->
+    <footer id="main-footer" class="relative z-20 w-full max-w-7xl mx-auto flex flex-wrap justify-between items-center text-xs text-slate-400 gap-2 pt-4 border-t border-white/10 transition-all duration-300">
+        <p>© 2026 SereneSpace Dashboard. Didesain untuk ketenangan & produktivitas.</p>
+        <div class="flex items-center gap-4">
+            <span class="flex items-center gap-1.5"><i class="fa-solid fa-circle text-[8px] text-rose-400"></i> Radio Streaming Indonesia</span>
+            <span>SereneSpace Engine</span>
+        </div>
+    </footer>
+
+    <!-- Floating Restore UI Button (Shown in Zen Mode / When Menus are Hidden) -->
+    <button id="btn-restore-ui" title="Tampilkan Kembali Semua Menu" class="fixed bottom-6 right-6 z-50 glass-card px-4 py-2.5 rounded-full text-xs font-semibold text-white flex items-center gap-2 shadow-2xl hover:scale-105 transition duration-300 border border-white/20 hidden">
+        <i class="fa-solid fa-eye text-emerald-400 text-sm"></i>
+        <span>Tampilkan Menu</span>
+    </button>
+
+    <script>
+        // ==========================================
+        // UTILITY: CUSTOM TOAST NOTIFICATION SYSTEM
+        // ==========================================
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            toast.className = `glass-card px-4 py-2.5 rounded-2xl text-xs font-semibold flex items-center gap-2 border border-white/20 shadow-2xl transition-all duration-300 transform translate-y-2 opacity-0 text-white pointer-events-auto`;
+            
+            let icon = 'fa-circle-info text-blue-400';
+            if (type === 'success') icon = 'fa-circle-check text-emerald-400';
+            if (type === 'radio') icon = 'fa-radio text-rose-400';
+            if (type === 'warning') icon = 'fa-triangle-exclamation text-amber-400';
+
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        // ==========================================
+        // 1. DIGITAL CLOCK & REAL-TIME GREETINGS
+        // ==========================================
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            
+            const clockEl = document.getElementById('digital-clock');
+            if (clockEl) clockEl.textContent = `${hours}:${minutes}:${seconds}`;
+
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const dateStr = now.toLocaleDateString('id-ID', options);
+            const dateEl = document.getElementById('date-display');
+            if (dateEl) dateEl.innerHTML = `<i class="fa-regular fa-calendar text-blue-400"></i> ${dateStr}`;
+
+            const hr = now.getHours();
+            let greeting = 'Selamat Hari Ini';
+            if (hr >= 4 && hr < 11) greeting = 'Selamat Pagi 🌅';
+            else if (hr >= 11 && hr < 15) greeting = 'Selamat Siang ☀️';
+            else if (hr >= 15 && hr < 18) greeting = 'Selamat Sore 🌇';
+            else greeting = 'Selamat Malam 🌙';
+
+            const badgeEl = document.getElementById('greeting-badge');
+            if (badgeEl) badgeEl.textContent = greeting;
+        }
+
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // ==========================================
+        // 2. LANDSCAPE PHOTOS & VIDEO BACKGROUND ENGINE
+        // ==========================================
+        const landscapes = [
+            { title: "Pegunungan Swiss Alps", url: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1920&q=80" },
+            { title: "Danau Tahoe & Kabut Pagi", url: "https://images.unsplash.com/photo-1511884642898-4c92249e20b6?auto=format&fit=crop&w=1920&q=80" },
+            { title: "Hutan Pinus Segar", url: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=1920&q=80" },
+            { title: "Lembah Pegunungan Yosemite", url: "https://images.unsplash.com/photo-1439853949127-fa647821eba0?auto=format&fit=crop&w=1920&q=80" },
+            { title: "Pantai Senja Sunset", url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80" },
+            { title: "Langit Malam Bintang & Aurora", url: "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1920&q=80" }
+        ];
+
+        let bgIndex = 0;
+        let isBg1Active = true;
+        let slideshowTimer = null;
+        let isSlideshowPlaying = true;
+
+        const bg1 = document.getElementById('bg1');
+        const bg2 = document.getElementById('bg2');
+        const bgTitle = document.getElementById('bg-title');
+        const bgCounter = document.getElementById('bg-counter');
+        const btnNextBg = document.getElementById('btn-next-bg');
+        const btnToggleSlideshow = document.getElementById('btn-toggle-slideshow');
+        const slideshowIcon = document.getElementById('slideshow-icon');
+
+        function setBackgroundImage(index) {
+            bgIndex = (index + landscapes.length) % landscapes.length;
+            const currentItem = landscapes[bgIndex];
+
+            if (isBg1Active) {
+                bg2.style.backgroundImage = `url('${currentItem.url}')`;
+                bg2.classList.remove('inactive');
+                bg2.classList.add('active');
+                bg1.classList.remove('active');
+                bg1.classList.add('inactive');
+            } else {
+                bg1.style.backgroundImage = `url('${currentItem.url}')`;
+                bg1.classList.remove('inactive');
+                bg1.classList.add('active');
+                bg2.classList.remove('active');
+                bg2.classList.add('inactive');
+            }
+
+            isBg1Active = !isBg1Active;
+            if (bgTitle) bgTitle.textContent = `Lokasi: ${currentItem.title}`;
+            if (bgCounter) bgCounter.textContent = `${bgIndex + 1} / ${landscapes.length}`;
+        }
+
+        function startSlideshow() {
+            if (slideshowTimer) clearInterval(slideshowTimer);
+            slideshowTimer = setInterval(() => {
+                setBackgroundImage(bgIndex + 1);
+            }, 12000);
+            isSlideshowPlaying = true;
+            if (slideshowIcon) slideshowIcon.className = "fa-solid fa-pause text-blue-400";
+        }
+
+        function stopSlideshow() {
+            if (slideshowTimer) clearInterval(slideshowTimer);
+            isSlideshowPlaying = false;
+            if (slideshowIcon) slideshowIcon.className = "fa-solid fa-play text-blue-400";
+        }
+
+        if (bg1) bg1.style.backgroundImage = `url('${landscapes[0].url}')`;
+        setBackgroundImage(0);
+        startSlideshow();
+
+        if (btnNextBg) {
+            btnNextBg.addEventListener('click', () => {
+                setBackgroundImage(bgIndex + 1);
+                if (isSlideshowPlaying) startSlideshow();
+            });
+        }
+
+        if (btnToggleSlideshow) {
+            btnToggleSlideshow.addEventListener('click', () => {
+                if (isSlideshowPlaying) {
+                    stopSlideshow();
+                    showToast("Rotasi background dijedakan");
+                } else {
+                    startSlideshow();
+                    showToast("Rotasi background otomatis diaktifkan");
+                }
+            });
+        }
+
+        // Fullscreen Toggle
+        const btnFullscreen = document.getElementById('btn-fullscreen');
+        if (btnFullscreen) {
+            btnFullscreen.addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                } else {
+                    if (document.exitFullscreen) document.exitFullscreen();
+                }
+            });
+        }
+
+        // ==========================================
+        // 3. RADIO ONLINE INDONESIA ENGINE (BARU)
+        // ==========================================
+        const defaultRadioStations = [
+            { id: 'prambors', name: 'Prambors FM 102.2', city: 'Jakarta', genre: 'Hits / Pop', category: 'pop', url: 'https://22283.live.streamtheworld.com:443/PRAMBORS_FM.mp3?dist=onlineradiobox', logo: 'fa-bolt text-amber-400' },
+            { id: 'iradio', name: 'I-Radio 89.6 FM', city: 'Jakarta', genre: 'Musik Indonesia', category: 'pop', url: 'https://n03.radiojar.com/4ywdgup3bnzuv', logo: 'fa-music text-purple-400' },
+            { id: 'rodja', name: 'Radio Rodja 756 AM', city: 'Bogor', genre: 'Kajian & Religi', category: 'religi', url: 'https://live2.radiorodja.com/rodja.mp3', logo: 'fa-mosque text-emerald-400' },
+            { id: 'suarasurabaya', name: 'Suara Surabaya 100 FM', city: 'Surabaya', genre: 'Berita & Informasi', category: 'berita', url: 'https://stream.suarasurabaya.net/suarasurabaya', logo: 'fa-newspaper text-blue-400' },
+            { id: 'elshinta', name: 'Radio Elshinta', city: 'Jakarta', genre: 'Berita 24 Jam', category: 'berita', url: 'https://s3.voscast.com:8401/stream', logo: 'fa-bullhorn text-rose-400' },
+            { id: 'bahana', name: 'Bahana 100.2 FM', city: 'Jakarta', genre: 'Pop & Hiburan', category: 'pop', url: 'https://indonesiastreaming.com/bahanafm/', logo: 'fa-radio text-indigo-400' },
+            { id: 'cbb', name: 'Radio CBB 105.4 FM', city: 'Jakarta', genre: 'Dangdut & Koplo', category: 'dangdut', url: 'https://indonesiastreaming.com/irmaradio/', logo: 'fa-guitar text-yellow-400' },
+            { id: 'globalbali', name: 'Global FM 96.5', city: 'Bali', genre: 'Informasi & Pop', category: 'daerah', url: 'https://indonesiastreaming.com/globalfm/', logo: 'fa-sun text-orange-400' }
+        ];
+
+        let radioList = [...defaultRadioStations];
+        const savedCustomRadios = JSON.parse(localStorage.getItem('custom_radio_stations') || '[]');
+        radioList = radioList.concat(savedCustomRadios);
+
+        let currentRadioIndex = 0;
+        let isRadioPlaying = false;
+        let activeRadioCat = 'all';
+
+        const radioAudio = document.getElementById('radio-audio-player');
+        const selectRadioStation = document.getElementById('select-radio-station');
+        const btnPlayRadio = document.getElementById('btn-play-radio');
+        const radioPlayIcon = document.getElementById('radio-play-icon');
+        const radioStatusText = document.getElementById('radio-status-text');
+        const radioBufferInfo = document.getElementById('radio-buffer-info');
+        const radioVolumeSlider = document.getElementById('radio-volume-slider');
+        const radioVolumeIcon = document.getElementById('radio-volume-icon');
+
+        const radioStationTitle = document.getElementById('radio-station-title');
+        const radioStationCity = document.getElementById('radio-station-city');
+        const radioStationGenre = document.getElementById('radio-station-genre');
+        const radioStationLogo = document.getElementById('radio-station-logo');
+        const radioBarsContainer = document.getElementById('radio-bars-container');
+
+        const btnToggleCustomRadio = document.getElementById('btn-toggle-custom-radio');
+        const customRadioForm = document.getElementById('custom-radio-form');
+        const customRadioName = document.getElementById('custom-radio-name');
+        const customRadioUrl = document.getElementById('custom-radio-url');
+        const btnAddCustomRadio = document.getElementById('btn-add-custom-radio');
+        const btnCancelCustomRadio = document.getElementById('btn-cancel-custom-radio');
+        const radioCategoryPills = document.querySelectorAll('.btn-radio-cat');
+
+        function populateRadioDropdown() {
+            if (!selectRadioStation) return;
+            selectRadioStation.innerHTML = '';
+
+            const filtered = radioList.filter(st => activeRadioCat === 'all' || st.category === activeRadioCat);
+
+            if (filtered.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = "";
+                opt.textContent = "Tidak ada stasiun di kategori ini";
+                selectRadioStation.appendChild(opt);
+                return;
+            }
+
+            filtered.forEach((st) => {
+                const realIndex = radioList.indexOf(st);
+                const opt = document.createElement('option');
+                opt.value = realIndex;
+                opt.textContent = `${st.name} (${st.city})`;
+                if (realIndex === currentRadioIndex) opt.selected = true;
+                selectRadioStation.appendChild(opt);
+            });
+        }
+
+        function loadRadioStation(index) {
+            if (index < 0 || index >= radioList.length) return;
+            currentRadioIndex = index;
+            const st = radioList[currentRadioIndex];
+
+            if (radioStationTitle) radioStationTitle.textContent = st.name;
+            if (radioStationCity) radioStationCity.textContent = st.city;
+            if (radioStationGenre) radioStationGenre.textContent = st.genre;
+            
+            if (radioStationLogo) {
+                radioStationLogo.innerHTML = `<i class="fa-solid ${st.logo || 'fa-radio'}"></i>`;
+            }
+
+            if (radioAudio) {
+                radioAudio.pause();
+                radioAudio.src = st.url;
+                radioAudio.load();
+            }
+
+            if (radioStatusText) radioStatusText.textContent = "Siap Memutar";
+            if (radioBufferInfo) radioBufferInfo.textContent = "Klik tombol putar";
+
+            if (isRadioPlaying) {
+                playRadioStream();
+            } else {
+                updateRadioUI(false);
+            }
+        }
+
+        function playRadioStream() {
+            if (!radioAudio) return;
+            
+            // Pause regular media player if playing to prevent overlapping audio
+            if (typeof pauseMedia === 'function') pauseMedia();
+
+            if (radioStatusText) radioStatusText.textContent = "Menghubungkan...";
+            if (radioBufferInfo) radioBufferInfo.textContent = "Buffering live stream...";
+
+            const promise = radioAudio.play();
+            if (promise !== undefined) {
+                promise.then(() => {
+                    isRadioPlaying = true;
+                    updateRadioUI(true);
+                    if (radioStatusText) radioStatusText.textContent = "Mengudara (Live)";
+                    if (radioBufferInfo) radioBufferInfo.textContent = radioList[currentRadioIndex].name;
+                    showToast(`Memutar Radio: ${radioList[currentRadioIndex].name}`, 'radio');
+                }).catch(err => {
+                    console.warn("Radio playback error / blocked:", err);
+                    isRadioPlaying = false;
+                    updateRadioUI(false);
+                    if (radioStatusText) radioStatusText.textContent = "Gagal Memutar";
+                    if (radioBufferInfo) radioBufferInfo.textContent = "Coba stasiun lain atau periksa koneksi";
+                    showToast("Tidak dapat menghubungkan stream radio ini.", 'warning');
+                });
+            }
+        }
+
+        function stopRadioStream() {
+            if (radioAudio) radioAudio.pause();
+            isRadioPlaying = false;
+            updateRadioUI(false);
+            if (radioStatusText) radioStatusText.textContent = "Diberhentikan";
+            if (radioBufferInfo) radioBufferInfo.textContent = "Klik Putar untuk mendengarkan";
+        }
+
+        function updateRadioUI(playing) {
+            if (radioPlayIcon) {
+                radioPlayIcon.className = playing ? "fa-solid fa-stop text-lg" : "fa-solid fa-play ms-0.5";
+            }
+            if (radioBarsContainer) {
+                if (playing) {
+                    radioBarsContainer.classList.remove('opacity-40');
+                    radioBarsContainer.classList.add('opacity-100');
+                } else {
+                    radioBarsContainer.classList.remove('opacity-100');
+                    radioBarsContainer.classList.add('opacity-40');
+                }
+            }
+        }
+
+        if (btnPlayRadio) {
+            btnPlayRadio.addEventListener('click', () => {
+                if (isRadioPlaying) {
+                    stopRadioStream();
+                } else {
+                    playRadioStream();
+                }
+            });
+        }
+
+        if (selectRadioStation) {
+            selectRadioStation.addEventListener('change', (e) => {
+                const idx = parseInt(e.target.value);
+                if (!isNaN(idx)) {
+                    loadRadioStation(idx);
+                    playRadioStream();
+                }
+            });
+        }
+
+        if (radioVolumeSlider) {
+            radioVolumeSlider.addEventListener('input', () => {
+                const vol = parseFloat(radioVolumeSlider.value);
+                if (radioAudio) radioAudio.volume = vol;
+                if (radioVolumeIcon) {
+                    if (vol === 0) radioVolumeIcon.className = "fa-solid fa-volume-xmark text-slate-400 text-xs";
+                    else if (vol < 0.5) radioVolumeIcon.className = "fa-solid fa-volume-low text-slate-300 text-xs";
+                    else radioVolumeIcon.className = "fa-solid fa-volume-high text-slate-300 text-xs";
+                }
+            });
+        }
+
+        // Category Filter Buttons Logic
+        radioCategoryPills.forEach(pill => {
+            pill.addEventListener('click', () => {
+                radioCategoryPills.forEach(p => {
+                    p.classList.remove('bg-blue-600', 'text-white');
+                    p.classList.add('glass-button', 'text-slate-300');
+                });
+                pill.classList.remove('glass-button', 'text-slate-300');
+                pill.classList.add('bg-blue-600', 'text-white');
+
+                activeRadioCat = pill.dataset.cat;
+                populateRadioDropdown();
+            });
+        });
+
+        // Custom Stream Toggle & Add
+        if (btnToggleCustomRadio) {
+            btnToggleCustomRadio.onclick = () => {
+                customRadioForm.classList.toggle('hidden');
+            };
+        }
+        if (btnCancelCustomRadio) {
+            btnCancelCustomRadio.onclick = () => {
+                customRadioForm.classList.add('hidden');
+            };
+        }
+        if (btnAddCustomRadio) {
+            btnAddCustomRadio.onclick = () => {
+                const name = customRadioName.value.trim();
+                const url = customRadioUrl.value.trim();
+
+                if (!name || !url) {
+                    showToast("Isi nama dan URL stream radio!", 'warning');
+                    return;
+                }
+
+                const newStation = {
+                    id: 'custom_' + Date.now(),
+                    name: name,
+                    city: 'Custom Stream',
+                    genre: 'Internet Radio',
+                    category: 'pop',
+                    url: url,
+                    logo: 'fa-tower-broadcast text-rose-400'
+                };
+
+                radioList.push(newStation);
+                savedCustomRadios.push(newStation);
+                localStorage.setItem('custom_radio_stations', JSON.stringify(savedCustomRadios));
+
+                customRadioName.value = '';
+                customRadioUrl.value = '';
+                customRadioForm.classList.add('hidden');
+
+                populateRadioDropdown();
+                loadRadioStation(radioList.length - 1);
+                playRadioStream();
+                showToast(`Stasiun radio "${name}" berhasil ditambahkan!`, 'success');
+            };
+        }
+
+        // Initialize Radio
+        populateRadioDropdown();
+        loadRadioStation(0);
+
+        // ==========================================
+        // 4. CALENDAR & NOTES SYSTEM
+        // ==========================================
+        let currentCalDate = new Date();
+        let selectedCalDateKey = '';
+
+        const calMonthYear = document.getElementById('cal-month-year');
+        const calDays = document.getElementById('cal-days');
+        const calPrev = document.getElementById('cal-prev');
+        const calNext = document.getElementById('cal-next');
+        const calToday = document.getElementById('cal-today');
+        const dateNoteInput = document.getElementById('date-note-input');
+        const btnSaveNote = document.getElementById('btn-save-note');
+        const selectedDateLabel = document.getElementById('selected-date-label');
+
+        function renderCalendar() {
+            if (!calDays || !calMonthYear) return;
+
+            const year = currentCalDate.getFullYear();
+            const month = currentCalDate.getMonth();
+
+            const monthNames = [
+                'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+            ];
+
+            calMonthYear.textContent = `${monthNames[month]} ${year}`;
+            calDays.innerHTML = '';
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const today = new Date();
+
+            for (let i = 0; i < firstDay; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'py-1.5 text-slate-700 pointer-events-none';
+                calDays.appendChild(emptyCell);
+            }
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dayBtn = document.createElement('button');
+                const isToday = d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+                const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                
+                dayBtn.textContent = d;
+                dayBtn.className = `py-1.5 rounded-xl transition text-xs font-medium flex items-center justify-center relative ${
+                    isToday ? 'bg-blue-600 text-white font-bold shadow-md' : 'hover:bg-white/10 text-slate-200'
+                }`;
+
+                if (localStorage.getItem(`note_${dateKey}`)) {
+                    const dot = document.createElement('span');
+                    dot.className = 'w-1.5 h-1.5 bg-amber-400 rounded-full absolute bottom-0.5';
+                    dayBtn.appendChild(dot);
+                }
+
+                dayBtn.onclick = () => selectCalendarDate(dateKey, d, monthNames[month], year);
+                calDays.appendChild(dayBtn);
+            }
+        }
+
+        function selectCalendarDate(dateKey, day, monthName, year) {
+            selectedCalDateKey = dateKey;
+            if (selectedDateLabel) selectedDateLabel.textContent = `Catatan (${day} ${monthName} ${year}):`;
+            const savedNote = localStorage.getItem(`note_${dateKey}`) || '';
+            if (dateNoteInput) dateNoteInput.value = savedNote;
+        }
+
+        if (calPrev) calPrev.onclick = () => { currentCalDate.setMonth(currentCalDate.getMonth() - 1); renderCalendar(); };
+        if (calNext) calNext.onclick = () => { currentCalDate.setMonth(currentCalDate.getMonth() + 1); renderCalendar(); };
+        if (calToday) calToday.onclick = () => { currentCalDate = new Date(); renderCalendar(); };
+
+        if (btnSaveNote) {
+            btnSaveNote.onclick = () => {
+                if (!selectedCalDateKey) {
+                    showToast("Pilih tanggal di kalender terlebih dahulu!", 'warning');
+                    return;
+                }
+                const noteVal = dateNoteInput ? dateNoteInput.value.trim() : '';
+                if (noteVal) {
+                    localStorage.setItem(`note_${selectedCalDateKey}`, noteVal);
+                    showToast("Catatan berhasil disimpan!", 'success');
+                } else {
+                    localStorage.removeItem(`note_${selectedCalDateKey}`);
+                    showToast("Catatan dihapus");
+                }
+                renderCalendar();
+            };
+        }
+
+        renderCalendar();
+
+        // ==========================================
+        // 5. UNIVERSAL MEDIA PLAYER ENGINE (MP3 & MP4)
+        // ==========================================
+        const playlist = [
+            {
+                title: "Lofi Chill Landscapes",
+                artist: "Serene Audio",
+                type: "audio",
+                format: "MP3",
+                src: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3"
+            },
+            {
+                title: "Pemandangan Alam Sampel",
+                artist: "Serene Video HD",
+                type: "video",
+                format: "MP4",
+                src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+            },
+            {
+                title: "Deep Focus Ambient Tone",
+                artist: "Serene Relaxation",
+                type: "audio",
+                format: "MP3",
+                src: "https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3?filename=relaxing-mountains-rivers-14280.mp3"
+            }
+        ];
+
+        let currentTrackIndex = 0;
+        let isMediaPlaying = false;
+
+        const playerAudio = document.getElementById('player-audio');
+        const playerVideo = document.getElementById('player-video');
+        const visualizerCanvas = document.getElementById('visualizer-canvas');
+        const btnPlayPause = document.getElementById('btn-play-pause');
+        const playIcon = document.getElementById('play-icon');
+        const btnPrevTrack = document.getElementById('btn-prev-track');
+        const btnNextTrack = document.getElementById('btn-next-track');
+        const seekSlider = document.getElementById('seek-slider');
+        const currentTimeEl = document.getElementById('current-time');
+        const durationTimeEl = document.getElementById('duration-time');
+        const volumeSlider = document.getElementById('volume-slider');
+        const volumeIcon = document.getElementById('volume-icon');
+
+        const mediaTitle = document.getElementById('media-title');
+        const mediaArtist = document.getElementById('media-artist');
+        const mediaFormatBadge = document.getElementById('media-format-badge');
+        const mediaTypeIcon = document.getElementById('media-type-icon');
+
+        const mediaFileInput = document.getElementById('media-file-input');
+        const btnTogglePlaylist = document.getElementById('btn-toggle-playlist');
+        const btnClosePlaylist = document.getElementById('btn-close-playlist');
+        const playlistDrawer = document.getElementById('playlist-drawer');
+        const playlistItems = document.getElementById('playlist-items');
+        const playlistCount = document.getElementById('playlist-count');
+
+        const bgVideoLayer = document.getElementById('bg-video-layer');
+        const btnBgMode = document.getElementById('btn-bg-mode');
+        const bgModeIcon = document.getElementById('bg-mode-icon');
+        const bgModeText = document.getElementById('bg-mode-text');
+
+        const btnSetBgVideo = document.getElementById('btn-set-bg-video');
+        const selectSpeed = document.getElementById('select-speed');
+        const btnPipVideo = document.getElementById('btn-pip-video');
+        const btnVideoFullscreen = document.getElementById('btn-video-fullscreen');
+
+        function getCurrentMediaElement() {
+            const track = playlist[currentTrackIndex];
+            return (track && track.type === 'video') ? playerVideo : playerAudio;
+        }
+
+        function loadTrack(index) {
+            if (playlist.length === 0) return;
+            currentTrackIndex = (index + playlist.length) % playlist.length;
+            const track = playlist[currentTrackIndex];
+
+            playerAudio.pause();
+            playerVideo.pause();
+
+            if (mediaTitle) mediaTitle.textContent = track.title;
+            if (mediaArtist) mediaArtist.textContent = track.artist;
+            if (mediaFormatBadge) mediaFormatBadge.textContent = track.format;
+
+            if (track.type === 'video') {
+                if (mediaTypeIcon) mediaTypeIcon.className = "fa-solid fa-file-video text-rose-400";
+                if (playerVideo) {
+                    playerVideo.classList.remove('hidden');
+                    playerVideo.src = track.src;
+                    playerVideo.load();
+                }
+                if (visualizerCanvas) visualizerCanvas.classList.add('hidden');
+            } else {
+                if (mediaTypeIcon) mediaTypeIcon.className = "fa-solid fa-music text-purple-400";
+                if (playerVideo) playerVideo.classList.add('hidden');
+                if (visualizerCanvas) visualizerCanvas.classList.remove('hidden');
+                if (playerAudio) {
+                    playerAudio.src = track.src;
+                    playerAudio.load();
+                }
+            }
+
+            if (seekSlider) seekSlider.value = 0;
+            if (currentTimeEl) currentTimeEl.textContent = "0:00";
+            if (durationTimeEl) durationTimeEl.textContent = "0:00";
+
+            renderPlaylistUI();
+
+            if (isMediaPlaying) {
+                playMedia();
+            } else {
+                updatePlayPauseIcon(false);
+            }
+        }
+
+        function playMedia() {
+            // Stop radio if playing when media file starts
+            if (isRadioPlaying) stopRadioStream();
+
+            const activeEl = getCurrentMediaElement();
+            if (!activeEl) return;
+
+            const promise = activeEl.play();
+            if (promise !== undefined) {
+                promise.then(() => {
+                    isMediaPlaying = true;
+                    updatePlayPauseIcon(true);
+                    if (playlist[currentTrackIndex].type === 'audio') {
+                        startVisualizer();
+                    }
+                }).catch(err => {
+                    console.warn("Media playback error:", err);
+                    isMediaPlaying = false;
+                    updatePlayPauseIcon(false);
+                });
+            }
+        }
+
+        function pauseMedia() {
+            playerAudio.pause();
+            playerVideo.pause();
+            isMediaPlaying = false;
+            updatePlayPauseIcon(false);
+        }
+
+        function togglePlayPause() {
+            if (isMediaPlaying) {
+                pauseMedia();
+            } else {
+                playMedia();
+            }
+        }
+
+        function updatePlayPauseIcon(playing) {
+            if (!playIcon) return;
+            playIcon.className = playing ? "fa-solid fa-pause" : "fa-solid fa-play ms-0.5";
+        }
+
+        function formatTime(seconds) {
+            if (isNaN(seconds) || seconds <= 0) return "0:00";
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        }
+
+        if (btnPlayPause) btnPlayPause.addEventListener('click', togglePlayPause);
+        if (btnPrevTrack) btnPrevTrack.addEventListener('click', () => { loadTrack(currentTrackIndex - 1); playMedia(); });
+        if (btnNextTrack) btnNextTrack.addEventListener('click', () => { loadTrack(currentTrackIndex + 1); playMedia(); });
+
+        [playerAudio, playerVideo].forEach(media => {
+            if (!media) return;
+
+            media.addEventListener('timeupdate', () => {
+                if (media !== getCurrentMediaElement()) return;
+                if (media.duration) {
+                    const pct = (media.currentTime / media.duration) * 100;
+                    if (seekSlider) seekSlider.value = pct;
+                    if (currentTimeEl) currentTimeEl.textContent = formatTime(media.currentTime);
+                    if (durationTimeEl) durationTimeEl.textContent = formatTime(media.duration);
+                }
+            });
+
+            media.addEventListener('ended', () => {
+                if (media !== getCurrentMediaElement()) return;
+                loadTrack(currentTrackIndex + 1);
+                playMedia();
+            });
+        });
+
+        if (seekSlider) {
+            seekSlider.addEventListener('input', () => {
+                const activeEl = getCurrentMediaElement();
+                if (activeEl && activeEl.duration) {
+                    activeEl.currentTime = (seekSlider.value / 100) * activeEl.duration;
+                }
+            });
+        }
+
+        if (volumeSlider) {
+            volumeSlider.addEventListener('input', () => {
+                const vol = parseFloat(volumeSlider.value);
+                if (playerAudio) playerAudio.volume = vol;
+                if (playerVideo) playerVideo.volume = vol;
+                if (volumeIcon) {
+                    if (vol === 0) volumeIcon.className = "fa-solid fa-volume-xmark text-slate-400";
+                    else if (vol < 0.5) volumeIcon.className = "fa-solid fa-volume-low text-slate-300";
+                    else volumeIcon.className = "fa-solid fa-volume-high text-slate-300";
+                }
+            });
+        }
+
+        if (mediaFileInput) {
+            mediaFileInput.addEventListener('change', (e) => {
+                const files = Array.from(e.target.files);
+                if (files.length === 0) return;
+
+                files.forEach(file => {
+                    const isVideo = file.type.startsWith('video');
+                    const fileUrl = URL.createObjectURL(file);
+                    const ext = file.name.split('.').pop().toUpperCase();
+
+                    playlist.push({
+                        title: file.name.replace(/\.[^/.]+$/, ""),
+                        artist: isVideo ? "Lokal Video" : "Lokal Audio",
+                        type: isVideo ? "video" : "audio",
+                        format: ext || (isVideo ? "MP4" : "MP3"),
+                        src: fileUrl
+                    });
+                });
+
+                showToast(`${files.length} file media ditambahkan ke playlist!`, 'success');
+                loadTrack(playlist.length - files.length);
+                playMedia();
+            });
+        }
+
+        function renderPlaylistUI() {
+            if (!playlistItems) return;
+            playlistItems.innerHTML = '';
+            if (playlistCount) playlistCount.textContent = playlist.length;
+
+            playlist.forEach((track, idx) => {
+                const li = document.createElement('li');
+                const isActive = idx === currentTrackIndex;
+                li.className = `p-2 rounded-xl flex items-center justify-between cursor-pointer transition ${
+                    isActive ? 'bg-blue-600/40 border border-blue-400/40 text-white font-semibold' : 'hover:bg-white/10 text-slate-300'
+                }`;
+
+                li.innerHTML = `
+                    <div class="flex items-center gap-2.5 overflow-hidden">
+                        <i class="fa-solid ${track.type === 'video' ? 'fa-file-video text-rose-400' : 'fa-music text-purple-400'} text-xs"></i>
+                        <span class="truncate text-xs">${track.title}</span>
+                    </div>
+                    <span class="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 shrink-0">${track.format}</span>
+                `;
+
+                li.onclick = () => {
+                    loadTrack(idx);
+                    playMedia();
+                };
+
+                playlistItems.appendChild(li);
+            });
+        }
+
+        if (btnTogglePlaylist && playlistDrawer) btnTogglePlaylist.onclick = () => playlistDrawer.classList.remove('translate-y-full');
+        if (btnClosePlaylist && playlistDrawer) btnClosePlaylist.onclick = () => playlistDrawer.classList.add('translate-y-full');
+
+        let visualizerAnimId = null;
+        function startVisualizer() {
+            if (!visualizerCanvas) return;
+            const ctx = visualizerCanvas.getContext('2d');
+            
+            function draw() {
+                visualizerAnimId = requestAnimationFrame(draw);
+                const w = visualizerCanvas.width = visualizerCanvas.clientWidth;
+                const h = visualizerCanvas.height = visualizerCanvas.clientHeight;
+
+                ctx.clearRect(0, 0, w, h);
+
+                const barWidth = 6;
+                const gap = 4;
+                const barCount = Math.floor(w / (barWidth + gap));
+                const time = Date.now() * 0.005;
+
+                for (let i = 0; i < barCount; i++) {
+                    const barHeight = isMediaPlaying 
+                        ? (Math.sin(time + i * 0.3) * 0.4 + 0.5) * (h * 0.7) + 5
+                        : 3;
+                    
+                    const x = i * (barWidth + gap);
+                    const y = h - barHeight;
+
+                    const gradient = ctx.createLinearGradient(0, h, 0, 0);
+                    gradient.addColorStop(0, '#3b82f6');
+                    gradient.addColorStop(1, '#a855f7');
+
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.roundRect(x, y, barWidth, barHeight, 3);
+                    ctx.fill();
+                }
+            }
+
+            if (visualizerAnimId) cancelAnimationFrame(visualizerAnimId);
+            draw();
+        }
+
+        if (btnSetBgVideo) {
+            btnSetBgVideo.addEventListener('click', () => {
+                const track = playlist[currentTrackIndex];
+                if (track && track.type === 'video') {
+                    if (bgVideoLayer) {
+                        bgVideoLayer.src = track.src;
+                        bgVideoLayer.classList.remove('opacity-0');
+                        bgVideoLayer.classList.add('opacity-100');
+                        bgVideoLayer.play();
+                    }
+                    if (bgModeIcon) bgModeIcon.className = "fa-solid fa-video text-rose-400";
+                    if (bgModeText) bgModeText.textContent = "Mode Video";
+                    showToast("Video dijadikan Live Background Wallpaper 🎥", 'success');
+                } else {
+                    showToast("Pilih track video (MP4) terlebih dahulu!", 'warning');
+                }
+            });
+        }
+
+        if (btnBgMode) {
+            btnBgMode.addEventListener('click', () => {
+                if (bgVideoLayer && bgVideoLayer.classList.contains('opacity-100')) {
+                    bgVideoLayer.classList.remove('opacity-100');
+                    bgVideoLayer.classList.add('opacity-0');
+                    bgVideoLayer.pause();
+                    if (bgModeIcon) bgModeIcon.className = "fa-solid fa-image text-blue-400";
+                    if (bgModeText) bgModeText.textContent = "Mode Foto";
+                    showToast("Kembali ke Wallpaper Foto");
+                } else {
+                    const track = playlist[currentTrackIndex];
+                    if (track && track.type === 'video') {
+                        btnSetBgVideo.click();
+                    } else {
+                        showToast("Putar atau upload video MP4 untuk Mode Live Video!", 'warning');
+                    }
+                }
+            });
+        }
+
+        if (selectSpeed) {
+            selectSpeed.addEventListener('change', () => {
+                const speed = parseFloat(selectSpeed.value);
+                playerVideo.playbackRate = speed;
+                playerAudio.playbackRate = speed;
+            });
+        }
+
+        if (btnPipVideo && playerVideo) {
+            btnPipVideo.addEventListener('click', async () => {
+                try {
+                    if (document.pictureInPictureElement) {
+                        await document.exitPictureInPicture();
+                    } else if (document.pictureInPictureEnabled && !playerVideo.hidden) {
+                        await playerVideo.requestPictureInPicture();
+                    }
+                } catch (err) {
+                    showToast("Mode Picture-in-Picture tidak didukung.", 'warning');
+                }
+            });
+        }
+
+        if (btnVideoFullscreen && playerVideo) {
+            btnVideoFullscreen.addEventListener('click', () => {
+                if (playerVideo.requestFullscreen) playerVideo.requestFullscreen();
+            });
+        }
+
+        loadTrack(0);
+
+        // ==========================================
+        // 6. AMBIENT SOUND SYNTHESIZER
+        // ==========================================
+        let ambientAudioCtx = null;
+        const activeSoundNodes = {};
+        const btnStopAllSounds = document.getElementById('btn-stop-all-sounds');
+        const ambientToggleBtns = document.querySelectorAll('.btn-ambient-toggle');
+
+        function getAmbientAudioContext() {
+            if (!ambientAudioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                ambientAudioCtx = new AudioContext();
+            }
+            if (ambientAudioCtx.state === 'suspended') {
+                ambientAudioCtx.resume();
+            }
+            return ambientAudioCtx;
+        }
+
+        const ambientSynths = {
+            rain: (ctx) => {
+                const bufferSize = ctx.sampleRate * 2;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+                for (let i = 0; i < bufferSize; i++) {
+                    const white = Math.random() * 2 - 1;
+                    b0 = 0.99886 * b0 + white * 0.0555179;
+                    b1 = 0.99332 * b1 + white * 0.0750759;
+                    b2 = 0.96900 * b2 + white * 0.1538520;
+                    b3 = 0.86650 * b3 + white * 0.3104856;
+                    b4 = 0.55000 * b4 + white * 0.5329522;
+                    b5 = -0.7616 * b5 - white * 0.0168980;
+                    data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.08;
+                    b6 = white * 0.115926;
+                }
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+                noise.loop = true;
+
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 1000;
+
+                const gain = ctx.createGain();
+                gain.gain.value = 0.8;
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(ctx.destination);
+                noise.start();
+
+                return { stop: () => { noise.stop(); noise.disconnect(); }, name: "Hujan" };
+            },
+
+            ocean: (ctx) => {
+                const bufferSize = ctx.sampleRate * 3;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * 0.18;
+                }
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+                noise.loop = true;
+
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 350;
+
+                const gainNode = ctx.createGain();
+                gainNode.gain.value = 0.5;
+
+                const lfo = ctx.createOscillator();
+                lfo.type = 'sine';
+                lfo.frequency.value = 0.12;
+
+                const lfoGain = ctx.createGain();
+                lfoGain.gain.value = 250;
+
+                lfo.connect(lfoGain);
+                lfoGain.connect(filter.frequency);
+
+                noise.connect(filter);
+                filter.connect(gainNode);
+                gainNode.connect(ctx.destination);
+
+                noise.start();
+                lfo.start();
+
+                return { 
+                    stop: () => { 
+                        noise.stop(); 
+                        lfo.stop(); 
+                        noise.disconnect(); 
+                        lfo.disconnect(); 
+                    }, 
+                    name: "Ombak Laut" 
+                };
+            },
+
+            wind: (ctx) => {
+                const bufferSize = ctx.sampleRate * 2;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * 0.15;
+                }
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+                noise.loop = true;
+
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 400;
+                filter.Q.value = 3.0;
+
+                const lfo = ctx.createOscillator();
+                lfo.frequency.value = 0.2;
+                const lfoGain = ctx.createGain();
+                lfoGain.gain.value = 300;
+
+                lfo.connect(lfoGain);
+                lfoGain.connect(filter.frequency);
+
+                const gainNode = ctx.createGain();
+                gainNode.gain.value = 0.7;
+
+                noise.connect(filter);
+                filter.connect(gainNode);
+                gainNode.connect(ctx.destination);
+
+                noise.start();
+                lfo.start();
+
+                return {
+                    stop: () => {
+                        noise.stop();
+                        lfo.stop();
+                        noise.disconnect();
+                    },
+                    name: "Deru Angin"
+                };
+            },
+
+            binaural: (ctx) => {
+                const oscLeft = ctx.createOscillator();
+                const oscRight = ctx.createOscillator();
+                
+                oscLeft.type = 'sine';
+                oscRight.type = 'sine';
+                
+                oscLeft.frequency.value = 210;
+                oscRight.frequency.value = 200;
+
+                const merger = ctx.createChannelMerger(2);
+                const gain = ctx.createGain();
+                gain.gain.value = 0.15;
+
+                oscLeft.connect(merger, 0, 0);
+                oscRight.connect(merger, 0, 1);
+                merger.connect(gain);
+                gain.connect(ctx.destination);
+
+                oscLeft.start();
+                oscRight.start();
+
+                return {
+                    stop: () => {
+                        oscLeft.stop();
+                        oscRight.stop();
+                        oscLeft.disconnect();
+                        oscRight.disconnect();
+                    },
+                    name: "Alpha Binaural"
+                };
+            },
+
+            fire: (ctx) => {
+                const bufferSize = ctx.sampleRate * 2;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    const rand = Math.random();
+                    data[i] = (rand > 0.985 ? (Math.random() * 2 - 1) * 0.8 : (Math.random() * 2 - 1) * 0.03);
+                }
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+                noise.loop = true;
+
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 1200;
+
+                const gain = ctx.createGain();
+                gain.gain.value = 0.6;
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(ctx.destination);
+
+                noise.start();
+
+                return {
+                    stop: () => {
+                        noise.stop();
+                        noise.disconnect();
+                    },
+                    name: "Api Unggun"
+                };
+            }
+        };
+
+        function updateStopAllVisibility() {
+            if (Object.keys(activeSoundNodes).length > 0) {
+                if (btnStopAllSounds) btnStopAllSounds.classList.remove('hidden');
+            } else {
+                if (btnStopAllSounds) btnStopAllSounds.classList.add('hidden');
+            }
+        }
+
+        ambientToggleBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const soundKey = btn.dataset.sound;
+                const ctx = getAmbientAudioContext();
+
+                if (activeSoundNodes[soundKey]) {
+                    activeSoundNodes[soundKey].stop();
+                    delete activeSoundNodes[soundKey];
+
+                    btn.innerHTML = `<i class="fa-solid fa-play me-1"></i>Putar`;
+                    btn.classList.remove('bg-emerald-500/40', 'bg-cyan-500/40', 'bg-teal-500/40', 'bg-purple-500/40', 'bg-amber-500/40');
+                    showToast(`Suara dihentikan`);
+                } else {
+                    if (ambientSynths[soundKey]) {
+                        const node = ambientSynths[soundKey](ctx);
+                        activeSoundNodes[soundKey] = node;
+
+                        btn.innerHTML = `<i class="fa-solid fa-pause me-1"></i>Jeda`;
+                        btn.classList.add('bg-emerald-500/40');
+                        showToast(`Suara relaksasi diputar: ${node.name} 🎧`);
+                    }
+                }
+                updateStopAllVisibility();
+            });
+        });
+
+        if (btnStopAllSounds) {
+            btnStopAllSounds.addEventListener('click', () => {
+                Object.keys(activeSoundNodes).forEach(key => {
+                    activeSoundNodes[key].stop();
+                    delete activeSoundNodes[key];
+                });
+                ambientToggleBtns.forEach(btn => {
+                    btn.innerHTML = `<i class="fa-solid fa-play me-1"></i>Putar`;
+                    btn.classList.remove('bg-emerald-500/40', 'bg-cyan-500/40', 'bg-teal-500/40', 'bg-purple-500/40', 'bg-amber-500/40');
+                });
+                updateStopAllVisibility();
+                showToast("Semua suara relaksasi dihentikan");
+            });
+        }
+
+        // ==========================================
+        // 7. JADWAL SHOLAT ENGINE
+        // ==========================================
+        const prayerTimesMap = {
+            Jakarta: { Fajr: "04:32", Dhuhr: "12:05", Asr: "15:18", Maghrib: "18:10", Isha: "19:21", Sunrise: "05:48" },
+            Bandung: { Fajr: "04:29", Dhuhr: "12:02", Asr: "15:15", Maghrib: "18:08", Isha: "19:19", Sunrise: "05:45" },
+            Surabaya: { Fajr: "04:12", Dhuhr: "11:45", Asr: "14:58", Maghrib: "17:51", Isha: "19:02", Sunrise: "05:28" },
+            Medan: { Fajr: "05:02", Dhuhr: "12:30", Asr: "15:40", Maghrib: "18:32", Isha: "19:42", Sunrise: "06:17" },
+            Semarang: { Fajr: "04:21", Dhuhr: "11:54", Asr: "15:07", Maghrib: "18:00", Isha: "19:11", Sunrise: "05:37" },
+            Yogyakarta: { Fajr: "04:22", Dhuhr: "11:55", Asr: "15:08", Maghrib: "18:01", Isha: "19:12", Sunrise: "05:38" },
+            Makassar: { Fajr: "04:45", Dhuhr: "12:13", Asr: "15:25", Maghrib: "18:18", Isha: "19:28", Sunrise: "06:01" },
+            Denpasar: { Fajr: "04:50", Dhuhr: "12:20", Asr: "15:30", Maghrib: "18:25", Isha: "19:35", Sunrise: "06:05" },
+            Palembang: { Fajr: "04:43", Dhuhr: "12:12", Asr: "15:22", Maghrib: "18:15", Isha: "19:25", Sunrise: "05:58" },
+            Banten: { Fajr: "04:35", Dhuhr: "12:08", Asr: "15:21", Maghrib: "18:13", Isha: "19:24", Sunrise: "05:51" }
+        };
+
+        const selectSholatCity = document.getElementById('select-sholat-city');
+        const nextPrayerName = document.getElementById('next-prayer-name');
+        const nextPrayerTime = document.getElementById('next-prayer-time');
+        const nextPrayerCountdown = document.getElementById('next-prayer-countdown');
+
+        function updatePrayerSchedule() {
+            const city = selectSholatCity ? selectSholatCity.value : 'Jakarta';
+            const schedule = prayerTimesMap[city] || prayerTimesMap['Jakarta'];
+
+            document.querySelectorAll('#sholat-grid .prayer-card').forEach(card => {
+                const prayerKey = card.dataset.prayer;
+                if (schedule[prayerKey]) {
+                    const timeEl = card.querySelector('.time-val');
+                    if (timeEl) timeEl.textContent = schedule[prayerKey];
+                }
+            });
+
+            // Calculate next prayer time
+            const now = new Date();
+            const currentMins = now.getHours() * 60 + now.getMinutes();
+
+            const prayerList = [
+                { name: 'Subuh', timeStr: schedule.Fajr },
+                { name: 'Dzuhur', timeStr: schedule.Dhuhr },
+                { name: 'Ashar', timeStr: schedule.Asr },
+                { name: 'Maghrib', timeStr: schedule.Maghrib },
+                { name: 'Isya', timeStr: schedule.Isha }
+            ];
+
+            let nextP = null;
+            for (let p of prayerList) {
+                const parts = p.timeStr.split(':');
+                const pMins = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+                if (pMins > currentMins) {
+                    nextP = { ...p, mins: pMins };
+                    break;
+                }
+            }
+
+            if (!nextP) {
+                nextP = { ...prayerList[0], mins: parseInt(prayerList[0].timeStr.split(':')[0]) * 60 + parseInt(prayerList[0].timeStr.split(':')[1]) + 24 * 60 };
+            }
+
+            if (nextPrayerName) nextPrayerName.textContent = nextP.name;
+            if (nextPrayerTime) nextPrayerTime.textContent = `${nextP.timeStr} WIB`;
+
+            const diffMins = nextP.mins - currentMins;
+            const diffHours = Math.floor(diffMins / 60);
+            const diffSecs = 59 - now.getSeconds();
+            const remMins = (diffMins % 60) - 1;
+
+            if (nextPrayerCountdown) {
+                nextPrayerCountdown.textContent = `${String(diffHours).padStart(2, '0')}:${String(Math.max(0, remMins)).padStart(2, '0')}:${String(diffSecs).padStart(2, '0')}`;
+            }
+        }
+
+        if (selectSholatCity) {
+            selectSholatCity.addEventListener('change', () => {
+                updatePrayerSchedule();
+                showToast(`Jadwal sholat diperbarui untuk ${selectSholatCity.value}`);
+            });
+        }
+
+        setInterval(updatePrayerSchedule, 1000);
+        updatePrayerSchedule();
+
+        // ==========================================
+        // 8. MEMO STICKY NOTES SYSTEM
+        // ==========================================
+        let memos = JSON.parse(localStorage.getItem('serene_memos') || '[]');
+
+        const memoForm = document.getElementById('memo-form');
+        const memoInput = document.getElementById('memo-input');
+        const memoColorSelect = document.getElementById('memo-color-select');
+        const memoList = document.getElementById('memo-list');
+        const memoCountLabel = document.getElementById('memo-count-label');
+        const btnClearDoneMemos = document.getElementById('btn-clear-done-memos');
+
+        const colorMap = {
+            amber: 'border-amber-500/40 bg-amber-500/10 text-amber-200',
+            emerald: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200',
+            blue: 'border-blue-500/40 bg-blue-500/10 text-blue-200',
+            rose: 'border-rose-500/40 bg-rose-500/10 text-rose-200'
+        };
+
+        function renderMemos() {
+            if (!memoList) return;
+            memoList.innerHTML = '';
+
+            if (memoCountLabel) memoCountLabel.textContent = `${memos.length} Memo Tersimpan`;
+
+            if (memos.length === 0) {
+                memoList.innerHTML = `<p class="text-center text-xs text-slate-500 py-4">Belum ada memo tersimpan</p>`;
+                return;
+            }
+
+            memos.forEach((memo, idx) => {
+                const item = document.createElement('div');
+                const badgeClass = colorMap[memo.color] || colorMap.amber;
+
+                item.className = `p-2.5 rounded-2xl border ${badgeClass} flex items-center justify-between gap-2 text-xs transition duration-200`;
+
+                item.innerHTML = `
+                    <div class="flex items-center gap-2 flex-1 min-w-0">
+                        <input type="checkbox" ${memo.done ? 'checked' : ''} class="rounded border-white/20 accent-amber-500 cursor-pointer">
+                        <span class="truncate ${memo.done ? 'line-through text-slate-400' : 'text-slate-100'}">${memo.text}</span>
+                    </div>
+                    <button class="btn-delete-memo text-slate-400 hover:text-rose-400 p-1 shrink-0">
+                        <i class="fa-solid fa-trash-can text-xs"></i>
+                    </button>
+                `;
+
+                const checkbox = item.querySelector('input[type="checkbox"]');
+                checkbox.onchange = () => {
+                    memos[idx].done = checkbox.checked;
+                    saveMemos();
+                    renderMemos();
+                };
+
+                const deleteBtn = item.querySelector('.btn-delete-memo');
+                deleteBtn.onclick = () => {
+                    memos.splice(idx, 1);
+                    saveMemos();
+                    renderMemos();
+                    showToast("Memo dihapus");
+                };
+
+                memoList.appendChild(item);
+            });
+        }
+
+        function saveMemos() {
+            localStorage.setItem('serene_memos', JSON.stringify(memos));
+        }
+
+        if (memoForm) {
+            memoForm.onsubmit = (e) => {
+                e.preventDefault();
+                const text = memoInput.value.trim();
+                if (!text) return;
+
+                memos.unshift({
+                    text: text,
+                    color: memoColorSelect.value,
+                    done: false,
+                    id: Date.now()
+                });
+
+                memoInput.value = '';
+                saveMemos();
+                renderMemos();
+                showToast("Memo baru berhasil ditambahkan!", 'success');
+            };
+        }
+
+        if (btnClearDoneMemos) {
+            btnClearDoneMemos.onclick = () => {
+                memos = memos.filter(m => !m.done);
+                saveMemos();
+                renderMemos();
+                showToast("Memo yang selesai dibersihkan");
+            };
+        }
+
+        renderMemos();
+
+        // ==========================================
+        // 9. DRAG & DROP REORDERING, WIDGET MANAGER & PERSISTENCE
+        // ==========================================
+        const widgetsContainer = document.getElementById('widgets-container');
+        const btnWidgetManager = document.getElementById('btn-widget-manager');
+        const widgetManagerModal = document.getElementById('widget-manager-modal');
+        const btnCloseWidgetManager = document.getElementById('btn-close-widget-manager');
+        const btnSaveWidgetManager = document.getElementById('btn-save-widget-manager');
+        const btnResetLayout = document.getElementById('btn-reset-layout');
+        const widgetToggleList = document.getElementById('widget-toggle-list');
+
+        const widgetMeta = [
+            { id: 'clock', title: 'Jam & Suasana', icon: 'fa-clock text-blue-400' },
+            { id: 'radio', title: 'Radio Online Indonesia', icon: 'fa-radio text-rose-400' },
+            { id: 'rain', title: 'Suara Relaksasi', icon: 'fa-spa text-emerald-400' },
+            { id: 'calendar', title: 'Kalender & Catatan', icon: 'fa-calendar-days text-blue-400' },
+            { id: 'player', title: 'Pemutar Media (MP3/MP4)', icon: 'fa-photo-film text-purple-400' },
+            { id: 'sholat', title: 'Jadwal Sholat', icon: 'fa-mosque text-emerald-400' },
+            { id: 'memo', title: 'Memo Khusus', icon: 'fa-note-sticky text-amber-400' }
+        ];
+
+        let draggedWidget = null;
+
+        function initDragAndDrop() {
+            const cards = document.querySelectorAll('.widget-card');
+            cards.forEach(card => {
+                card.addEventListener('dragstart', (e) => {
+                    draggedWidget = card;
+                    card.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+
+                card.addEventListener('dragend', () => {
+                    card.classList.remove('dragging');
+                    cards.forEach(c => c.classList.remove('drag-over'));
+                    saveWidgetState();
+                });
+
+                card.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    if (card !== draggedWidget) {
+                        card.classList.add('drag-over');
+                    }
+                });
+
+                card.addEventListener('dragleave', () => {
+                    card.classList.remove('drag-over');
+                });
+
+                card.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    card.classList.remove('drag-over');
+                    if (draggedWidget && card !== draggedWidget) {
+                        const allWidgets = Array.from(widgetsContainer.querySelectorAll('.widget-card'));
+                        const draggedIndex = allWidgets.indexOf(draggedWidget);
+                        const targetIndex = allWidgets.indexOf(card);
+
+                        if (draggedIndex < targetIndex) {
+                            widgetsContainer.insertBefore(draggedWidget, card.nextSibling);
+                        } else {
+                            widgetsContainer.insertBefore(draggedWidget, card);
+                        }
+                    }
+                });
+            });
+        }
+
+        // Widget Action Buttons (Focus, Collapse, Hide)
+        function initWidgetActions() {
+            document.querySelectorAll('.btn-focus-widget').forEach(btn => {
+                btn.onclick = () => {
+                    const card = btn.closest('.widget-card');
+                    const isFocused = card.classList.contains('widget-focused');
+                    
+                    document.querySelectorAll('.widget-card').forEach(c => c.classList.remove('widget-focused'));
+                    
+                    if (!isFocused) {
+                        card.classList.add('widget-focused');
+                        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        showToast("Widget difokuskan di tengah");
+                    }
+                };
+            });
+
+            document.querySelectorAll('.btn-toggle-collapse').forEach(btn => {
+                btn.onclick = () => {
+                    const card = btn.closest('.widget-card');
+                    const content = card.querySelector('.widget-content');
+                    const icon = btn.querySelector('i');
+
+                    if (content) {
+                        content.classList.toggle('hidden');
+                        if (content.classList.contains('hidden')) {
+                            icon.className = "fa-solid fa-chevron-down";
+                        } else {
+                            icon.className = "fa-solid fa-chevron-up";
+                        }
+                    }
+                };
+            });
+
+            document.querySelectorAll('.btn-hide-widget').forEach(btn => {
+                btn.onclick = () => {
+                    const card = btn.closest('.widget-card');
+                    card.classList.add('hidden');
+                    saveWidgetState();
+                    showToast("Widget disembunyikan. Gunakan Kelola Widget untuk memulihkan.");
+                };
+            });
+        }
+
+        function saveWidgetState() {
+            const currentWidgets = Array.from(widgetsContainer.querySelectorAll('.widget-card')).map(card => ({
+                id: card.dataset.widgetId,
+                hidden: card.classList.contains('hidden')
+            }));
+            localStorage.setItem('serene_widget_layout', JSON.stringify(currentWidgets));
+        }
+
+        function loadWidgetState() {
+            const saved = JSON.parse(localStorage.getItem('serene_widget_layout') || '[]');
+            if (saved.length === 0) return;
+
+            saved.forEach(item => {
+                const card = document.getElementById(`widget-${item.id}`);
+                if (card) {
+                    if (item.hidden) card.classList.add('hidden');
+                    else card.classList.remove('hidden');
+                    widgetsContainer.appendChild(card);
+                }
+            });
+        }
+
+        function renderWidgetManagerModal() {
+            if (!widgetToggleList) return;
+            widgetToggleList.innerHTML = '';
+
+            const currentWidgetCards = Array.from(widgetsContainer.querySelectorAll('.widget-card'));
+
+            currentWidgetCards.forEach(card => {
+                const wId = card.dataset.widgetId;
+                const meta = widgetMeta.find(m => m.id === wId) || { title: wId, icon: 'fa-cube' };
+                const isVisible = !card.classList.contains('hidden');
+
+                const row = document.createElement('div');
+                row.className = "flex items-center justify-between p-2 rounded-xl bg-slate-900/60 border border-white/5";
+                row.innerHTML = `
+                    <div class="flex items-center gap-2.5">
+                        <i class="fa-solid ${meta.icon} text-sm"></i>
+                        <span class="font-medium text-slate-200">${meta.title}</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" data-target-id="widget-${wId}" ${isVisible ? 'checked' : ''} class="sr-only peer">
+                        <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                `;
+                widgetToggleList.appendChild(row);
+            });
+        }
+
+        if (btnWidgetManager) {
+            btnWidgetManager.onclick = () => {
+                renderWidgetManagerModal();
+                widgetManagerModal.classList.remove('opacity-0', 'pointer-events-none');
+            };
+        }
+
+        if (btnCloseWidgetManager) {
+            btnCloseWidgetManager.onclick = () => {
+                widgetManagerModal.classList.add('opacity-0', 'pointer-events-none');
+            };
+        }
+
+        if (btnSaveWidgetManager) {
+            btnSaveWidgetManager.onclick = () => {
+                const checkboxes = widgetToggleList.querySelectorAll('input[type="checkbox"]');
+                checkboxes.forEach(cb => {
+                    const targetCard = document.getElementById(cb.dataset.targetId);
+                    if (targetCard) {
+                        if (cb.checked) targetCard.classList.remove('hidden');
+                        else targetCard.classList.add('hidden');
+                    }
+                });
+                saveWidgetState();
+                widgetManagerModal.classList.add('opacity-0', 'pointer-events-none');
+                showToast("Tata letak widget disimpan!", 'success');
+            };
+        }
+
+        if (btnResetLayout) {
+            btnResetLayout.onclick = () => {
+                localStorage.removeItem('serene_widget_layout');
+                document.querySelectorAll('.widget-card').forEach(card => card.classList.remove('hidden', 'widget-focused'));
+                showToast("Tata letak widget telah di-reset ke standar");
+                setTimeout(() => window.location.reload(), 500);
+            };
+        }
+
+        initDragAndDrop();
+        initWidgetActions();
+        loadWidgetState();
+
+        // ==========================================
+        // 10. ZEN MODE / HIDE UI LOGIC
+        // ==========================================
+        const btnZenMode = document.getElementById('btn-zen-mode');
+        const btnRestoreUi = document.getElementById('btn-restore-ui');
+        const mainHeader = document.getElementById('main-header');
+        const mainFooter = document.getElementById('main-footer');
+
+        function enableZenMode() {
+            if (mainHeader) mainHeader.classList.add('zen-hidden');
+            if (widgetsContainer) widgetsContainer.classList.add('zen-hidden');
+            if (mainFooter) mainFooter.classList.add('zen-hidden');
+            if (btnRestoreUi) btnRestoreUi.classList.remove('hidden');
+            showToast("Mode Suasana Bersih diaktifkan ✨");
+        }
+
+        function disableZenMode() {
+            if (mainHeader) mainHeader.classList.remove('zen-hidden');
+            if (widgetsContainer) widgetsContainer.classList.remove('zen-hidden');
+            if (mainFooter) mainFooter.classList.remove('zen-hidden');
+            if (btnRestoreUi) btnRestoreUi.classList.add('hidden');
+        }
+
+        if (btnZenMode) btnZenMode.onclick = enableZenMode;
+        if (btnRestoreUi) btnRestoreUi.onclick = disableZenMode;
+
+    </script>
+</body>
+</html>
